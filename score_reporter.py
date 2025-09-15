@@ -67,65 +67,141 @@
 
 # ========== Pythonコード（オリジナル） ==========
 
-scores = {}
+# scores = {}
 
-while True:
-    subject = input("科目名を入力してください：").strip()
-    if subject == "":
-        print("科目名が空白のため終了します。")
-        break
+# while True:
+#     subject = input("科目名を入力してください：").strip()
+#     if subject == "":
+#         print("科目名が空白のため終了します。")
+#         break
     
-    try:
-        score = int(input("点数を入力してください。").strip())
-    except ValueError:
-        print("数字を入力してください。")
-        continue
+#     try:
+#         score = int(input("点数を入力してください。").strip())
+#     except ValueError:
+#         print("数字を入力してください。")
+#         continue
 
-    if score < 0:
-        print("0以上の数字を入力してください。")
-        continue
+#     if score < 0:
+#         print("0以上の数字を入力してください。")
+#         continue
 
-    scores[subject] = score
+#     scores[subject] = score
 
-if not scores:
-    print("取り扱うデータがないため、結果を表示できません。")
-else:
+# if not scores:
+#     print("取り扱うデータがないため、結果を表示できません。")
+# else:
+#     total = sum(scores.values())
+#     count = len(scores)
+#     avg = total / count
+#     average = round(avg, 1)
+
+#     sort_scores = sorted(scores.items(), key=lambda item:(-item[1], item[0]))   # 辞書型ではなく、タプルのリストとして格納される。
+
+#     max_score = max(scores.values())
+
+#     winners = []                                # 理由: 空のリストを用意して、見つかった科目名を順に入れていく
+#     for subject, point in sort_scores:          # （科目名, 点数）のペアを1件ずつ確認
+#         if point == max_score:                  # その点数が最高点と同じなら
+#             winners.append(subject)             # winners に科目名を追加する
+#     winners = sorted(winners)                   # 追加した科目名を昇順に
+
+# #   上を内包表記した場合
+# #   winners = [subject for subject, point in scores.items() if point == max_score]
+
+#     if len(sort_scores) >= 3:                   # 上位3位の「しきい値（3位の点数）」を決める
+#         third_score = sort_scores[2][1]         # 3番目の要素の点数（インデックス2）（変数名は3位の点数という意味）
+#     else:
+#         third_score = float('-inf')             # 3件未満なら、あるだけ全部を対象にするため最小値を設定
+
+#     top_with_tie = [pair for pair in sort_scores if pair[1] >= third_score] # pair は ("科目名", 点数)。変数名は「上位（top）」＋「同点を含む（with_tie）」
+
+#     print("=" * 30)
+#     print("点数一覧（高い順）")
+#     for subject, point in sort_scores:
+#         print(f" {subject}: {point}点")
+#     print(f"同率1位:{', '.join(winners)} {max_score}点")
+#     print("上位3件（同点含む）：")
+#     for i, (subject, point) in enumerate(top_with_tie, start=1):
+#         print(f"{i}) {subject}: {point}点")
+#     print(f"科目数:{count} / 合計点数:{total}点 / 平均点数:{average}点")
+
+# ========== Pythonコード（Chat GPT） ==========
+
+# ========== Pythonコード（関数化ver.） ==========
+
+def read_scores():
+    scores = {}
+    while True:
+        subject = input("科目名を入力してください：").strip()
+        if subject == "":
+            print("空白が入力されたので終了します。")
+            break
+
+        try:
+            score = int(input("点数を入力してください：").strip())
+        except ValueError:
+            print("整数を入力してください。")
+            continue
+
+        if score < 0:
+            print("0以上の整数を入力してください。")
+            continue
+
+        scores[subject] = score
+
+    return scores
+
+def calc_stats(scores):
     total = sum(scores.values())
     count = len(scores)
     avg = total / count
-    average = round(avg, 1)
-
-    sort_scores = sorted(scores.items(), key=lambda item:(-item[1], item[0]))   # 辞書型ではなく、タプルのリストとして格納される。
-
+    average = round(avg,1)
     max_score = max(scores.values())
+    return total, count, average, max_score
 
-    winners = []                                # 理由: 空のリストを用意して、見つかった科目名を順に入れていく
-    for subject, point in sort_scores:          # （科目名, 点数）のペアを1件ずつ確認
-        if point == max_score:                  # その点数が最高点と同じなら
-            winners.append(subject)             # winners に科目名を追加する
-    winners = sorted(winners)                   # 追加した科目名を昇順に
+def sort_by_score(scores):
+    ranked = sorted(scores.items(), key=lambda item:(-item[1], item[0]))
+    return ranked
 
-#   上を内包表記した場合
-#   winners = [subject for subject, point in scores.items() if point == max_score]
+def find_winners(scores, max_score):
+    winners = [subject for subject, point in scores.items() if point == max_score]
+    winners = sorted(winners)
+    return winners
 
-    if len(sort_scores) >= 3:                   # 上位3位の「しきい値（3位の点数）」を決める
-        third_score = sort_scores[2][1]         # 3番目の要素の点数（インデックス2）（変数名は3位の点数という意味）
+def top_n_with_ties(ranked, n=3):
+    if len(ranked) >= n:
+        threshold = ranked[n-1][1]
     else:
-        third_score = float('-inf')             # 3件未満なら、あるだけ全部を対象にするため最小値を設定
+        threshold = float('-inf')
+    
+    top_with_tie = [pair for pair in ranked if pair[1] >= threshold]
+    return top_with_tie
 
-    top_with_tie = [pair for pair in sort_scores if pair[1] >= third_score] # pair は ("科目名", 点数)。変数名は「上位（top）」＋「同点を含む（with_tie）」
-
+def print_report(total, count, average, max_score, ranked, winners, top_with_tie):
     print("=" * 30)
     print("点数一覧（高い順）")
-    for subject, point in sort_scores:
+    for subject, point in ranked:
         print(f" {subject}: {point}点")
     print(f"同率1位:{', '.join(winners)} {max_score}点")
-    print("上位3件（同点含む）：")
+    print("上位3位（同点含む）")
     for i, (subject, point) in enumerate(top_with_tie, start=1):
         print(f"{i}) {subject}: {point}点")
-    print(f"科目数:{count} / 合計点数:{total}点 / 平均点数:{average}点")
+    print(f"科目数:{count} 合計点数:{total}点 平均点数:{average}点")
+    print("=" * 30)
 
-# ========== Pythonコード（Chat GPT） ==========
+def main():
+    scores = read_scores()
+    if not scores:
+        print("表示できるデータがありません。")
+    else:
+        total, count, average, max_score = calc_stats(scores)
+        ranked = sort_by_score(scores)
+        winners = find_winners(scores, max_score)
+        top_with_tie = top_n_with_ties(ranked)
+        print_report(total, count, average, max_score, ranked, winners, top_with_tie)
+
+if __name__ == "__main__":
+    main()
 
 # ========== 修正・改善点 ==========
 
