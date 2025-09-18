@@ -16,7 +16,6 @@ if not os.path.exists(csv_path):                 # 初回起動などでCSVが�
     with open(csv_path, "w", encoding="utf-8", newline="") as f:  
         writer = csv.writer(f)                   # writer: 行ごとにリストを書き出す道具
         writer.writerow(["subject", "score"])    # ヘッダー行を1回だけ書く
-        @[and
 
 # ========== 1件だけ追加する例 ==========
 

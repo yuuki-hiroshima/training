@@ -132,73 +132,116 @@
 # ========== Pythonコード（オリジナル） ==========
 
 
-## 0) 準備
+## 0) 準備：CSVの場所を決める。初回起動時にCSVがなければヘッダーだけ作る。
 
-- `data/` が無ければ作成する
-- `data/scores.csv` が無ければ、**ヘッダー行だけ**書いて作成する（`subject,score`）
+import os
+import csv
 
-## 1) 読み込み（CSV → 辞書）
+data_dir = "data"
+os.makedirs(data_dir, exist_ok=True)
 
-- `scores_by_subject = {}` を用意
-- CSVを開く（`"r", encoding="utf-8", newline=""`）
-- `csv.DictReader` で1行ずつ読む
-    - `subject = row["subject"]` の前後空白を削除
-    - `score = int(row["score"])` に変換（変換できない行はスキップしてよい）
-    - `subject` が空でなければ `scores_by_subject[subject] = score` に格納（同名科目があれば**最後の値が有効**）
+csv_path = os.path.join(data_dir, "scores.csv")
 
-## 2) 表示（一覧・件数・平均）
+if not os.path.exists(csv_path):
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["subject", "score"])
+        print("scores.csv を新規作成しました（ヘッダーのみ）。")
 
-- `subjects_sorted = sorted(scores_by_subject.keys())`
-- 各科目について `科目名: 点数` を表示
-- `count = 件数（len(scores_by_subject)）`
-- `total = 点数の合計（sum(scores_by_subject.values())）`
-- `average = round(total / count, 1)`（**0件のとき**は平均の代わりに「データなし」と表示）
+## 1) 読み込み（CSV → 辞書）：CSVを開いて全行読み込み、辞書に保存する。
+
+scores_by_subject = {}
+
+with open(csv_path, "r", encoding="utf-8", newline="") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        subject = row["subject"].strip()
+        if subject == "":
+            continue
+        try:
+            score = int(row["score"])
+        except ValueError:
+            continue
+        scores_by_subject[subject] = score
+
+## 2) 表示（一覧・件数・平均）：科目名でソートして毎回同じ順番にする
+# 各モード終了後に最新状態を表示するために関数化
+
+def show_summary(scores_by_subject):
+    subjects_sorted = sorted(scores_by_subject.keys())
+    print("=== 現在の成績 ===")
+    for subj in subjects_sorted:
+        print(f"  {subj}: {scores_by_subject[subj]} 点")
+
+    count = len(scores_by_subject)
+    if count == 0:
+        print("データがありません。")
+    else:
+        total = sum(scores_by_subject.values())
+        average = round(total / count, 1)
+        print(f"件数: {count} / 合計: {total} / 平均: {average}")
+
+show_summary(scores_by_subject)
 
 ## 3) メニュー（ループ）
 
-- `while True:`
-    - メニュー表示：「1: 追加 / 2: 削除 / 3: 保存して終了」
-    - `choice = input("番号を入力：").strip()`
-    - **分岐**
-        - `choice == "1"` → **追加モード**へ
-        - `choice == "2"` → **削除モード**へ
-        - `choice == "3"` → **保存して終了**へ
-        - その他 → 「1/2/3 を選んでください」と再表示
+while True:
+    print("\n--- メニュー ---")
+    print("1) 追加  2) 削除  3) 保存して終了")
+    choice = input("番号を入力してください:").strip()
 
 ### 3-1) 追加モード
 
-- `while True:`
-    - `subject = input("科目名（空で追加終了）：").strip()`
-    - `if subject == "": break`（追加モード終了）
-    - `score_str = input("点数（0以上の整数）：").strip()`
-    - **点数の検証**
-        - `try: score = int(score_str)`
-        - `except: 「整数を入力」→ continue`
-        - `if score < 0: 「0以上を入力」→ continue`
-    - `scores_by_subject[subject] = score`（新規追加 or 上書き）
-    - 「追加（or 上書き）しました」と表示
-- 追加モードを抜けたら、**2) 表示**を呼ぶ
+    if choice == "1":
+        while True:
+            subject = input("科目名（空で追加モード終了）:").strip()
+            if subject == "":
+                break
+
+            score_str = input("点数（0以上の整数）:").strip()
+            try:
+                score = int(score_str)
+            except ValueError:
+                print("整数を入力してください。")
+                continue
+
+            if score < 0:
+                print("0以上の数を入力してください。")
+                continue
+
+            scores_by_subject[subject] = score
+            print(f"登録しました: {subject} = {score}")
+        
+        show_summary(scores_by_subject)
 
 ### 3-2) 削除モード
 
-- `target = input("削除する科目名（空でキャンセル）：").strip()`
-- `if target == "":` → 「キャンセルしました」
-- `elif target in scores_by_subject:` → `del scores_by_subject[target]`、「削除しました」
-- `else:` → 「見つかりませんでした」
-- その後、**2) 表示**を呼ぶ
+    elif choice == "2":
+        target = input("削除する科目名（空でキャンセル）:").strip()
+        if target == "":
+            print("キャンセルされました。")
+        elif target in scores_by_subject:
+            del scores_by_subject[target]
+            print(f"削除しました:{target}")
+        else:
+            print("見つかりませんでした。")
 
+        show_summary(scores_by_subject)
+    
 ### 3-3) 保存して終了
 
-- **CSV保存**
-    - CSVを `"w", encoding="utf-8", newline=""` で開く
-    - `csv.writer` でヘッダー行 `["subject","score"]` を書く
-    - `for subject in sorted(scores_by_subject.keys()):`
-        - `writer.writerow([subject, scores_by_subject[subject]])`
-- **（拡張）JSON保存**
-    - `rows = [{"subject": s, "score": scores_by_subject[s]} for s in sorted(...) ]`
-    - `"w", encoding="utf-8"` で開いて `json.dump(rows, f, ensure_ascii=False, indent=2)`
-- 「保存しました。終了します。」と表示
-- `break` でメインループを抜けてプログラム終了
+    elif choice == "3":
+        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["subject", "score"])
+            for subj in sorted(scores_by_subject.keys()):
+                writer.writerow([subj, scores_by_subject[subj]])
+            
+        print("保存しました。終了します。")
+        break
+    
+    else:
+        print("1 / 2 / 3 のいずれかを入力してください。")
 
 # ========== Pythonコード（Chat GPT） ==========
 
