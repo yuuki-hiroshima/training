@@ -131,6 +131,7 @@
 
 # ========== Pythonコード（オリジナル） ==========
 
+# ========== Pythonコード（Chat GPT（CSVのみ）） ==========
 
 ## 0) 準備：CSVの場所を決める。初回起動時にCSVがなければヘッダーだけ作る。
 
@@ -243,8 +244,154 @@ while True:
     else:
         print("1 / 2 / 3 のいずれかを入力してください。")
 
-# ========== Pythonコード（Chat GPT） ==========
+# ========== Pythonコード（Chat GPT（CSV＋JSON）） ==========
 
+# =========================
+# 成績マネージャー（CSV + JSON版）
+# 変更点が分かるように ★印 を付けています
+# 各行に役割コメントを付け、初学者でも追いやすくしています
+# =========================
+
+import os                      # フォルダ・ファイルの存在確認や作成に使う
+import csv                     # CSVの読み書きに使う
+import json                    # JSONの読み書きに使う  # ★追加
+
+# ---------- 0) 準備 ----------
+data_dir = "data"                                  # データ保存用のフォルダ名
+os.makedirs(data_dir, exist_ok=True)               # 無ければ作る／あってもエラーにしない
+
+csv_path = os.path.join(data_dir, "scores.csv")    # CSVファイルのパス
+json_path = os.path.join(data_dir, "scores.json")  # JSONファイルのパス  # ★追加
+
+# CSVが無い初回は、ヘッダーだけ書いて作成
+if not os.path.exists(csv_path):
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)                     # CSVの“書き手”を用意
+        writer.writerow(["subject", "score"])      # 1行目にヘッダーを書き込む
+        print("scores.csv を新規作成しました（ヘッダーのみ）。")
+
+# ---------- 1) 読み込み（CSV → 辞書） ----------
+scores_by_subject = {}                             # 科目名→点数 の辞書（内部表現）
+
+with open(csv_path, "r", encoding="utf-8", newline="") as f:
+    reader = csv.DictReader(f)                     # 1行を {"subject":..., "score":...} で返す
+    for row in reader:                             # 行を1件ずつ取り出す
+        subject = row["subject"].strip()           # 科目名の前後の空白を除去
+        if subject == "":                          # 空の科目は無効
+            continue
+        try:
+            score = int(row["score"])              # "90"→90 に変換（文字列→整数）
+        except ValueError:                         # 文字など不正な値はスキップ
+            continue
+        scores_by_subject[subject] = score         # 登録 or 上書き
+
+# ---------- 表示用の関数（共通化） ----------
+def show_summary(scores_by_subject):
+    """現在の一覧・件数・平均を表示する（見やすさのために関数化）"""
+    subjects_sorted = sorted(scores_by_subject.keys())    # 科目名でソート（毎回同じ順に表示）
+    print("=== 現在の成績 ===")
+    for subj in subjects_sorted:                          # 科目を1件ずつ表示
+        print(f"  {subj}: {scores_by_subject[subj]} 点")
+
+    count = len(scores_by_subject)                        # 科目数
+    if count == 0:                                        # 0件なら平均は出さない
+        print("データがありません。")
+    else:
+        total = sum(scores_by_subject.values())           # 合計点
+        average = round(total / count, 1)                 # 平均（小数第1位で四捨五入）
+        print(f"件数: {count} / 合計: {total} / 平均: {average}")
+
+# ---------- 保存系の関数（CSV/JSON） ----------
+def save_to_csv(scores_by_subject, csv_path):             # ★新規関数
+    """辞書の内容をCSVにヘッダー付きで上書き保存する"""
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)                            # CSVの“書き手”
+        writer.writerow(["subject", "score"])             # ヘッダー行
+        for subj in sorted(scores_by_subject.keys()):     # 見やすいように科目名でソートして出力
+            writer.writerow([subj, scores_by_subject[subj]])
+
+def save_to_json(scores_by_subject, json_path):           # ★新規関数
+    """辞書の内容をJSONに保存する（人間が読みやすい整形つき）"""
+    rows = []                                             # JSONには「行のリスト」で保存
+    for subj in sorted(scores_by_subject.keys()):         # 科目名でソートして安定化
+        rows.append({"subject": subj, "score": scores_by_subject[subj]})
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(rows, f, ensure_ascii=False, indent=2)  # 日本語そのまま＋インデントで整形
+
+def load_from_json(json_path):                            # ★新規関数
+    """JSONから読み込み、辞書（科目→点数）に変換して返す"""
+    if not os.path.exists(json_path):                     # JSONが無いときは空を返す
+        print("scores.json が見つかりません。")
+        return {}
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)                               # data は [{"subject":..,"score":..}, ...]
+    result = {}
+    for row in data:
+        subj = str(row.get("subject", "")).strip()        # subject を取り出し、前後空白を除去
+        if subj == "":
+            continue
+        try:
+            sc = int(row.get("score", 0))                 # score を整数化（無ければ0想定）
+        except ValueError:
+            continue
+        result[subj] = sc                                 # 登録 or 上書き
+    return result
+
+# ---------- 起動時の表示 ----------
+show_summary(scores_by_subject)                           # 現在の状態を確認表示
+
+# ---------- 3) メニュー（追加／削除／保存して終了／JSON読込） ----------
+while True:
+    print("\n--- メニュー ---")
+    print("1) 追加  2) 削除  3) 保存して終了  4) JSONから読み込み（上書き）")   # ★変更（4 を追加）
+    choice = input("番号を入力してください: ").strip()
+
+    if choice == "1":                                     # 追加モード
+        while True:
+            subject = input("科目名（空で追加モード終了）: ").strip()
+            if subject == "":
+                break
+            score_str = input("点数（0以上の整数）: ").strip()
+            try:
+                score = int(score_str)
+            except ValueError:
+                print("整数を入力してください。")
+                continue
+            if score < 0:
+                print("0以上の数を入力してください。")
+                continue
+            scores_by_subject[subject] = score
+            print(f"登録しました: {subject} = {score}点")
+        show_summary(scores_by_subject)                   # 追加後の状態を表示
+
+    elif choice == "2":                                   # 削除モード
+        target = input("削除する科目名（空でキャンセル）: ").strip()
+        if target == "":
+            print("キャンセルしました。")
+        elif target in scores_by_subject:
+            del scores_by_subject[target]
+            print(f"削除しました: {target}")
+        else:
+            print("見つかりませんでした。")
+        show_summary(scores_by_subject)                   # 削除後の状態を表示
+
+    elif choice == "3":                                   # 保存して終了
+        save_to_csv(scores_by_subject, csv_path)          # CSVへ保存  # ★変更（関数化）
+        save_to_json(scores_by_subject, json_path)        # JSONへ保存 # ★追加
+        print("CSV と JSON に保存しました。終了します。")
+        break                                             # ループを抜ける
+
+    elif choice == "4":                                   # JSONから読み込み（上書き）  # ★追加
+        loaded = load_from_json(json_path)                # JSONを読み込む（辞書で戻る）
+        if loaded:                                        # 読み込みに成功したら
+            scores_by_subject = loaded                    # 今のデータをJSONの内容で上書き
+            print("JSONから読み込みました（現在データを置き換え）。")
+            show_summary(scores_by_subject)               # 置き換え結果を表示
+        else:
+            print("JSONの読み込みをスキップしました。")    # 何も無い or エラー時
+
+    else:
+        print("1 / 2 / 3 / 4 のいずれかを入力してください。")  # 無効入力の案内
 # ========== 修正・改善点 ==========
 
 # ========== 総括 ==========
